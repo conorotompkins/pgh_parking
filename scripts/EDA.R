@@ -1,6 +1,9 @@
 library(tidyverse)
 library(lubridate)
 library(tidyr)
+library(ggrepel)
+library(ggforce)
+library(ggmap)
 #devtools::install_github("tidyverse/tidyr")
 
 theme_set(theme_bw())
@@ -53,3 +56,52 @@ df %>%
   summarize(meter_transactions = sum(meter_transactions)) %>% 
   ggplot(aes(start, meter_transactions)) +
   geom_point()
+
+df_geo_labels <- geolocations %>% 
+  group_by(zone) %>% 
+  summarize(longitude_mean = mean(longitude, na.rm = TRUE),
+         latitude_mean =mean(latitude, na.rm = TRUE))
+
+geolocations %>% 
+  ggplot(aes(longitude, latitude, color = zone)) +
+  geom_point() +
+  geom_label_repel(data = df_geo_labels, aes(longitude_mean, latitude_mean, label = zone)) +
+  guides(color = FALSE)
+
+geolocations %>% 
+  group_by(zone) %>% 
+  summarize_at(vars(c("longitude", "latitude")), mean, na.rm = TRUE) %>% 
+  ggplot(aes(longitude, latitude, color = zone, label = zone)) +
+  geom_label_repel() +
+  guides(color = FALSE)
+
+geolocations %>% 
+  ggplot(aes(longitude)) +
+  geom_density()
+
+geolocations %>% 
+  ggplot(aes(longitude, latitude)) +
+  geom_point(size = .5) +
+  facet_wrap(~zone)
+
+ggmap::get_map(location = "Pittsburgh, PA", zoom = 12, maptype = "roadmap", source = "google") %>% 
+  ggmap()
+
+pgh_map <- ggmap::get_map(location = "North Oakland, Pittsburgh, PA", zoom = 12, maptype = "roadmap", source = "google")
+
+top_locations <- df %>% 
+  count(zone, sort = TRUE) %>% 
+  head(20)
+
+df_geo <- geolocations %>% 
+  filter(location_type == "On street") %>% 
+  semi_join(top_locations) %>% 
+  filter(!is.infinite(longitude), !is.infinite(latitude),
+         !is.na(longitude), !is.na(latitude)) 
+
+ggmap(pgh_map) +
+  geom_mark_ellipse(data = df_geo, aes(longitude, latitude, fill = zone, label = zone), 
+                    expand = .01, label.buffer = unit(15, "mm")) +
+  geom_point(data = df_geo, aes(longitude, latitude, color = zone), size = .3) +
+  guides(color = FALSE, fill = FALSE) +
+  facet_wrap(~location_type)
