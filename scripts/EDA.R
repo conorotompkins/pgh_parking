@@ -17,9 +17,9 @@ df <- data %>%
 #  pivot_longer(cols = c("mobile_transactions", "meter_transactions"), 
 #               names_to = "transaction_type", 
 #               values_to = "transactions") #%>% 
-  #pivot_longer(cols = c("mobile_payments", "meter_payments"),
-  #             names_to = "payment_type",
-  #             values_to = "payments")
+#pivot_longer(cols = c("mobile_payments", "meter_payments"),
+#             names_to = "payment_type",
+#             values_to = "payments")
 #df
 df %>% 
   group_by(zone) %>% 
