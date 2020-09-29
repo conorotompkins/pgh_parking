@@ -64,7 +64,9 @@ data_historical <- df_ts %>%
 
 data_2020 <- df_ts %>% 
   select(start_date, week_of_year, total_parking_events) %>% 
-  filter(start_date >= "2020-01-01")
+  filter(start_date >= "2020-01-01") %>% 
+  group_by(week_of_year) %>% 
+  summarize(total_parking_events = sum(total_parking_events))
 
 df <- data_2020 %>% 
   left_join(data_historical)
@@ -93,6 +95,16 @@ data %>%
   separate(zone, sep = " - ", into = c("zone_id", "zone_name")) %>% 
   count(zone_name, sort = TRUE) %>% 
   View()
+
+data %>% 
+  distinct(zone)
+
+data %>% 
+  distinct(zone) %>% 
+  separate(zone, sep = " - ", into = c("zone_id", "zone_name")) %>% 
+  distinct(zone_name)
+
+
 
 #analyze weekday vs weekend difference per week, historical vs 2020
 
