@@ -85,20 +85,19 @@ df %>%
   geom_smooth(span = .4, color = "black")
 
 #analyze weekday vs weekend difference per week, historical vs 2020
-weekday_historical <- df_ts %>% 
+df_ts %>% 
   select(start_date, week_of_year, weekday, total_parking_events) %>% 
-  filter(start_date < "2020-01-01") %>% 
-  mutate(is_weekend = case_when(weekday %in% c("Sat", "Sun") ~ "weekend",
-                                !(weekday %in% c("Sat", "Sun")) ~ "not_weekend")) %>% 
-  group_by(is_weekend) %>% 
-  summarize(avg_parking_events = mean(total_parking_events))
-
-weekday_2020 <- df_ts %>% 
-  select(start_date, week_of_year, weekday, total_parking_events) %>% 
-  filter(start_date >= "2020-01-01") %>% 
-  mutate(is_weekend = (weekday %in% c("Sat", "Sun"))) %>% 
-  group_by(is_weekend) %>% 
-  summarize(avg_parking_events = mean(total_parking_events))
-
-
-
+  mutate(period = case_when(start_date >= "2020-01-01" ~ "2020",
+                            start_date < "2020-01-01" ~ "Before times"),
+         is_weekend = case_when(weekday %in% c("Sat", "Sun") ~ "weekend",
+                                !(weekday %in% c("Sat", "Sun")) ~ "weekday")) %>% 
+  mutate(period = fct_relevel(period, "Before times"),
+         is_weekend = fct_relevel(is_weekend, "weekday")) %>% 
+  group_by(period, is_weekend) %>% 
+  summarize(total_parking_events = sum(total_parking_events)) %>% 
+  mutate(pct_of_parking_events = total_parking_events / sum(total_parking_events)) %>% 
+  ggplot(aes(period, pct_of_parking_events, fill = is_weekend)) +
+  geom_col(position = position_dodge(width = 1), color = "black", alpha = .8) +
+  scale_y_percent() +
+  scale_fill_viridis_d()
+  
