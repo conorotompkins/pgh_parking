@@ -2,6 +2,8 @@ library(tidyverse)
 library(lubridate)
 library(vroom)
 library(hrbrthemes)
+library(broom)
+library(heatwaveR)
 
 options(scipen = 999,
         digits = 4)
@@ -36,14 +38,21 @@ data %>%
 # df_ts %>%
 #   write_csv("data/summarized_parking_data.csv")
 
-df_ts <- read_csv("data/summarized_parking_data.csv")
+df_ts <- read_csv("data/summarized_parking_data.csv") %>% 
+  group_by(year, week_of_year) %>%
+  mutate(first_date_of_week = min(start_date)) %>% 
+  ungroup() %>% 
+  #select(-start_date) %>% 
+  select(first_date_of_week, everything())
+  
 
 df_ts %>% 
-  ggplot(aes(start_date, total_parking_transactions)) +
+  ggplot(aes(first_date_of_week, total_parking_transactions)) +
   geom_point(alpha = .2, size = .5) +
   labs(x = "Year",
        y = "Total parking transactions") +
-  scale_y_comma()
+  scale_y_comma() +
+  scale_x_date(date_labels = "%b %d")
 
 df_ts %>% 
   select(year, week_of_year, total_parking_transactions) %>% 
@@ -58,7 +67,8 @@ df_ts %>%
   geom_line() +
   #geom_line(aes(y = week_median_parking_events), color = "black", size = 1) +
   scale_color_manual(values = c("red", "grey")) +
-  labs(x = "Week of year",
+  scale_y_comma() +
+  labs(#x = "Week of year",
        y = "Total parking events",
        color = "Period")
 
@@ -74,11 +84,11 @@ data_historical <- df_ts %>%
   ungroup()
 
 data_2020 <- df_ts %>% 
-  select(start_date, week_of_year, total_parking_transactions) %>% 
+  select(start_date, first_date_of_week, week_of_year, total_parking_transactions) %>% 
   filter(start_date >= "2020-01-01",
          #remove current week of data
          week_of_year < week(Sys.Date())) %>% 
-  group_by(week_of_year) %>% 
+  group_by(first_date_of_week, week_of_year) %>% 
   summarize(total_parking_transactions = sum(total_parking_transactions))
 
 df <- data_2020 %>% 
@@ -89,10 +99,57 @@ df %>%
 
 df %>% 
   mutate(pct_difference = (total_parking_transactions - median_historical_transactions) / median_historical_transactions) %>% 
-  ggplot(aes(week_of_year, pct_difference)) +
-  geom_jitter(alpha = .3) +
+  ggplot(aes(first_date_of_week, pct_difference)) +
+  geom_point(alpha = .3) +
   geom_smooth(span = .4, color = "black") +
   scale_y_percent()
+
+df %>% 
+  mutate(pct_difference = (total_parking_transactions - median_historical_transactions) / median_historical_transactions) %>% 
+  ggplot(aes(x = first_date_of_week, y = 0, y2 = pct_difference)) +
+  heatwaveR::geom_flame() +
+  geom_line(aes(y = pct_difference), size = 1.5) +
+  scale_y_percent() +
+  labs(title = "2020 vs. historical average",
+       x = "Date",
+       y = "Percent difference")
+
+smoothed_line_df <- df %>% 
+  mutate(pct_difference = (total_parking_transactions - median_historical_transactions) / median_historical_transactions) %>% 
+  select(week_of_year, pct_difference) %>% 
+  nest(parking_data = everything()) %>% 
+  mutate(model = map(parking_data, ~loess(pct_difference ~ week_of_year, data = .x, span = .3)),
+         coeff = map(model, augment))
+
+smoothed_line_df <- smoothed_line_df %>% 
+  unnest(parking_data) %>% 
+  left_join(unnest(smoothed_line_df, coeff)) %>% 
+  select(first_date_of_week, .fitted) %>% 
+  mutate(sign = .fitted > 0,
+         population = "total")
+
+smoothed_line_df %>% 
+  ggplot(aes(x = first_date_of_week)) +
+  heatwaveR::geom_flame(aes(y = 0, y2 = .fitted)) +
+  geom_line(aes(y = .fitted), size = 1.5) +
+  geom_hline(yintercept = 0, lty = 2) +
+  scale_y_percent() +
+  labs(title = "2020 vs. historical average",
+       x = "Date",
+       y = "Percent difference")
+
+smoothed_line_df %>% 
+  ggplot(aes(x = first_date_of_week, y = .fitted, fill = sign, color = sign)) +
+  geom_area(ymin = 0) +
+  #geom_line(aes(group = population))
+  geom_line() +
+  geom_point()
+
+smoothed_line_df %>% 
+  ggplot() +
+  geom_ribbon(aes(x = first_date_of_week, ymin = 0, ymax = .fitted,
+                  color = sign, fill = sign))
+  
 
 #analyze weekday vs weekend difference per week, historical vs 2020
 df_ts %>% 
