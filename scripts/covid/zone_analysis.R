@@ -44,8 +44,11 @@ geocoded_parking_locations %>%
 # df_ts_neighborhood %>% 
 #   write_csv("data/summarized_parking_data_neighborhood.csv")
 
-df_ts_neighborhood <- read_csv("data/summarized_parking_data_neighborhood.csv")
-
+df_ts_neighborhood <- read_csv("data/summarized_parking_data_neighborhood.csv") %>% 
+  group_by(year, week_of_year) %>% 
+  mutate(first_date_of_week = min(start_date)) %>% 
+  ungroup() %>% 
+  select(zone_region, start_date, year, week_of_year, first_date_of_week, everything())
 
 zone_fct <- df_ts_neighborhood %>% 
   group_by(zone_region) %>% 
@@ -53,7 +56,6 @@ zone_fct <- df_ts_neighborhood %>%
   arrange(total_parking_events) %>% 
   pull(zone_region)
   
-
 df_ts_neighborhood %>% 
   group_by(zone_region, week_of_year) %>% 
   summarize(total_parking_events = sum(total_parking_events)) %>% 
@@ -102,7 +104,7 @@ df_historical <- df_historical %>%
 df_2020 <- df_ts_neighborhood %>% 
   filter(start_date >= "2020-01-01") %>% 
   complete(zone_region, week_of_year, fill = list(total_parking_events = 0)) %>% 
-  group_by(zone_region, week_of_year) %>% 
+  group_by(zone_region, week_of_year, first_date_of_week) %>% 
   summarize(total_parking_events = sum(total_parking_events)) %>% 
   ungroup()
 
@@ -115,7 +117,7 @@ df_combined
 #line chart
 line_chart <- df_combined %>%
   semi_join(top_zone_regions) %>% 
-  ggplot(aes(week_of_year, pct_difference, group = zone_region)) +
+  ggplot(aes(first_date_of_week, pct_difference, group = zone_region)) +
   geom_hline(yintercept = 0, lty = 2, alpha = .5) +
   geom_line(alpha = .3) +
   scale_y_percent() +
@@ -132,7 +134,9 @@ line_chart %>%
 #tile chart
 tile_chart <- df_combined %>% 
   semi_join(top_zone_regions) %>% 
-  mutate(zone_region = factor(zone_region, levels = zone_fct)) %>% 
+  mutate(zone_region = factor(zone_region, levels = zone_fct),
+         #first_date_of_week = as.factor(first_date_of_week)
+         ) %>% 
   ggplot(aes(week_of_year, zone_region, fill = pct_difference)) +
   geom_tile() +
   scale_fill_viridis_c(labels = percent) +
@@ -155,12 +159,13 @@ ggplotly(tile_chart) %>%
 #with boxplots
 df_combined %>% 
   semi_join(top_zone_regions) %>% 
-  ggplot(aes(week_of_year, pct_difference, group = week_of_year)) +
+  ggplot(aes(first_date_of_week, pct_difference, group = week_of_year)) +
   geom_boxplot(outlier.alpha = .3, outlier.size = 1) +
   geom_hline(yintercept = 0, lty = 2, alpha = .5) +
   scale_y_percent() +
   labs(title = "2020 vs. historical average",
-       x = "Week of year",
+       subtitle = "Top 13 neighborhoods",
+       x = "Date",
        y = "Percent difference")
 
 #difference in difference
