@@ -23,22 +23,25 @@ geocoded_parking_locations %>%
   count(zone_region, sort = TRUE) %>% 
   View()
 
-# df_ts_neighborhood <- data %>% 
-#   left_join(geocoded_parking_locations) %>% 
-#   select(zone_region, start, meter_transactions, mobile_transactions) %>% 
-#   separate(start, into = c("start_date", "start_time"), remove = TRUE, sep = " ") %>% 
-#   mutate(start_date = ymd(start_date)) %>% 
-#   group_by(zone_region, start_date) %>% 
+# df_ts_neighborhood <- data %>%
+#   left_join(geocoded_parking_locations) %>%
+#   select(zone_region, start, meter_transactions, mobile_transactions) %>%
+#   separate(start, into = c("start_date", "start_time"), remove = TRUE, sep = " ") %>%
+#   mutate(start_date = ymd(start_date)) %>%
+#   group_by(zone_region, start_date) %>%
 #   summarize(meter_transactions = sum(meter_transactions),
-#             mobile_transactions = sum(mobile_transactions)) %>% 
-#   ungroup() %>% 
-#   rowwise() %>% 
-#   mutate(total_parking_events = meter_transactions + mobile_transactions) %>% 
-#   ungroup() %>% 
+#             mobile_transactions = sum(mobile_transactions)) %>%
+#   ungroup() %>%
+#   rowwise() %>%
+#   mutate(total_parking_events = meter_transactions + mobile_transactions) %>%
+#   ungroup() %>%
 #   mutate(year = year(start_date),
 #          day_of_year = yday(start_date),
 #          week_of_year = week(start_date),
-#          weekday = wday(start_date, label = TRUE)) %>% 
+#          weekday = wday(start_date, label = TRUE)) %>%
+#   group_by(year, week_of_year) %>% 
+#   mutate(first_date_of_week = min(start_date)) %>% 
+#   ungroup() %>% 
 #   select(zone_region, start_date, day_of_year, week_of_year, weekday, everything())
 # 
 # df_ts_neighborhood %>% 
@@ -123,7 +126,7 @@ line_chart <- df_combined %>%
   scale_y_percent() +
   labs(title = "2020 vs. historical average",
        subtitle = "Top 13 neighborhoods",
-       x = "Week of year",
+       x = "Date",
        y = "Percent difference")
 
 line_chart
@@ -167,14 +170,3 @@ df_combined %>%
        subtitle = "Top 13 neighborhoods",
        x = "Date",
        y = "Percent difference")
-
-#difference in difference
-df_combined %>% 
-  semi_join(top_zone_regions) %>% 
-  mutate(difference = total_parking_events - median_parking_events_historical) %>% 
-  group_by(week_of_year) %>%
-  summarize(difference = sum(difference)) %>% 
-  mutate(difference_lag = difference - lag(difference)) %>% 
-  ungroup() %>% 
-  ggplot(aes(week_of_year, difference_lag)) +
-  geom_line()
