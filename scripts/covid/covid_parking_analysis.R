@@ -15,7 +15,6 @@ data <- vroom("data/1ad5394f-d158-46c1-9af7-90a9ef4e0ce1.csv")
 glimpse(data)
 
 data %>% 
-  distinct(zone) %>% 
   arrange(zone)
   
 # df_ts <- data %>%
@@ -33,8 +32,11 @@ data %>%
 #          day_of_year = yday(start_date),
 #          week_of_year = week(start_date),
 #          weekday = wday(start_date, label = TRUE)) %>%
+#   group_by(year, week_of_year) %>%
+#   mutate(first_date_of_week = min(start_date)) %>% 
+#   ungroup() %>% 
 #   select(start_date, year, week_of_year, day_of_year, weekday, everything())
-# 
+
 # df_ts %>%
 #   write_csv("data/summarized_parking_data.csv")
 
@@ -170,3 +172,23 @@ df_ts %>%
   labs(x = NULL,
        y = "Percent of transactions",
        fill = "Day type")
+
+weekly_pct_difference_df <- data_2020 %>% 
+  mutate(weekly_difference = total_parking_transactions - lag(total_parking_transactions),
+         weekly_pct_difference = weekly_difference / lag(total_parking_transactions))
+
+weekly_pct_difference_df %>% 
+  mutate(max_drop_flag = weekly_pct_difference == min(weekly_pct_difference, na.rm = TRUE),
+         max_drop = case_when(max_drop_flag == TRUE ~ weekly_pct_difference,
+                              max_drop_flag == FALSE ~ NA_real_)) %>% 
+  ggplot(aes(first_date_of_week, weekly_pct_difference)) +
+  geom_line() +
+  geom_point() +
+  geom_point(aes(y = max_drop), color = "red", size = 3) +
+  ggrepel::geom_label_repel(aes(y = max_drop, label = scales::percent(max_drop)),
+                            direction = "x") +
+  scale_y_percent() +
+  coord_cartesian(ylim = c(-1, 1)) +
+  labs(title = "Week-to-week difference",
+       x = "Date",
+       y = "Percent difference")
